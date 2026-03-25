@@ -10,8 +10,6 @@ HOSTS_FILE = Path("C:/Windows/System32/drivers/etc/hosts")
 
 # Backup directory (relative to script)
 script_dir = Path(__file__).parent.resolve()
-BACKUP_DIR = script_dir.parent / "config"
-BACKUP_DIR.mkdir(exist_ok=True)
 
 def load_env(env_path):
     """Parse a .env file and return a dict (no external dependencies)."""
@@ -90,7 +88,7 @@ def write_hosts_file(content):
 def backup_hosts_file():
     """Create a backup of the hosts file."""
     try:
-        backup_file = BACKUP_DIR / "hosts.txt"
+        backup_file = script_dir / "hosts.txt"
         shutil.copy2(HOSTS_FILE, backup_file)
         print(f"✓ Backup saved: {backup_file}")
         return True
@@ -199,7 +197,7 @@ def main():
 
     print("\nAdministrator privileges: ✓")
     print(f"Hosts file: {HOSTS_FILE}")
-    print(f"Backup:     {BACKUP_DIR / 'hosts.txt'}\n")
+    print(f"Backup:     {script_dir / 'hosts.txt'}\n")
 
     while True:
         add_new_host()
