@@ -6,13 +6,12 @@ Recursively scans a root directory and reports Git repositories that are not ali
   - remote commits not yet pulled (requires --fetch)
 
 Usage:
-  python git-check.py <workdir>          # local check only
-  python git-check.py <workdir> --fetch  # also run git fetch on each repo (slower)
+  python git-check.py <workdir>                    # local check only
+  python git-check.py <workdir> --fetch            # also check remote
+  python git-check.py <workdir> --fetch --depth 3  # deeper search
 """
 
-import os
 import subprocess
-import sys
 import argparse
 from pathlib import Path
 
@@ -103,17 +102,17 @@ def main():
     parser = argparse.ArgumentParser(
         description='Recursively find Git repositories and report unaligned ones.'
     )
-    parser.add_argument('workdir', nargs='?', default='.', help='Root directory to scan (default: .)')
+    parser.add_argument('workdir', help='Root directory to scan recursively')
     parser.add_argument('--fetch', action='store_true', help='Run git fetch on each repo before checking (slower)')
     parser.add_argument('--depth', type=int, default=2, help='Max directory depth to search (default: 2)')
     args = parser.parse_args()
 
-    root = Path(args.workdir)
-    if not root.exists():
+    root = Path(args.workdir).resolve()
+    if not root.is_dir():
         print(f'Error: directory "{root}" not found.')
-        sys.exit(1)
+        raise SystemExit(1)
 
-    print(f'Scanning: {root.resolve()}')
+    print(f'Scanning: {root}')
     if args.fetch:
         print('Mode: with git fetch (may be slow)\n')
     else:
@@ -126,7 +125,6 @@ def main():
 
     print(f'Repositories found: {len(repos)}\n')
     print('=' * 60)
-
     not_aligned = []
 
     for repo in repos:
@@ -147,10 +145,6 @@ def main():
 
     print('=' * 60)
     print(f'Total: {len(not_aligned)}/{len(repos)} unaligned.')
-
-
-if __name__ == '__main__':
-    main()
 
 
 if __name__ == '__main__':
