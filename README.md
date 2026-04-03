@@ -33,7 +33,7 @@ py -m pip install Pillow pillow-heif pypdf reportlab
 
 Both `src/` and `out/` are created automatically on first run.
 
-> **For `hosts_add.py`:** copy `hosts_add.env.example` to `hosts_add.env` and fill in your IP presets (see [IP presets configuration](#ip-presets-configuration)).
+> **For `hosts_add.py`:** copy `.env.example` to `.env` and fill in your IP presets (see [IP presets configuration](#ip-presets-configuration)).
 
 ---
 
@@ -58,8 +58,12 @@ toolkit/
 ├── videos_compress.py
 ├── videos_resize.py
 ├── hosts_add.py
-├── hosts_add.env.example   # IP presets template (commit this)
-└── hosts_add.env           # Your local presets (gitignored)
+├── .env.example            # Config template (commit this)
+├── .env                    # Your local config (gitignored)
+└── server-kit/
+    ├── compress-jpgs.py
+    ├── git-check.py
+    └── video-optimizer.py
 ```
 
 ---
@@ -195,7 +199,7 @@ Resizes videos. Two modes available.
 ### `hosts_add.py`
 Adds entries to the Windows hosts file. Requires administrator privileges (auto-elevates).
 - **Features:**
-  - IP presets loaded dynamically from `hosts_add.env` (one per line, any number)
+  - IP presets loaded dynamically from `.env` (one per line, any number)
   - Always includes `127.0.0.1` (localhost) and a Custom option
   - Duplicate detection with optional overwrite
   - Automatic backup saved to `../config/hosts.txt`
@@ -205,11 +209,40 @@ Adds entries to the Windows hosts file. Requires administrator privileges (auto-
 
 #### IP presets configuration
 
-Copy `hosts_add.env.example` to `hosts_add.env` (gitignored) and add your presets:
+Copy `.env.example` to `.env` (gitignored) and add your presets:
 
 ```ini
-PRESET_1=192.168.1.50|custom.local
+HOSTS_ADD_PRESET_1=192.168.1.50|custom.local
 ```
 
-Format: `PRESET_N=ip|label` -- add as many as needed, numbered sequentially.  
-`hosts_add.env.example` is the template to commit; `hosts_add.env` stays local.
+Format: `HOSTS_ADD_PRESET_N=ip|label` -- add as many as needed, numbered sequentially.  
+`.env.example` is the template to commit; `.env` stays local.
+
+---
+
+## Server-kit scripts
+
+Scripts in `server-kit/` are designed to run directly on a server (or any machine) against a target directory passed as an argument. They do **not** use `src/` / `out/` folders.
+
+### `server-kit/compress-jpgs.py`
+Recursively scans a directory and recompresses JPEG files older than a given age using ffmpeg. Replaces the original only if the compressed file is smaller.
+- **Usage:** `py server-kit/compress-jpgs.py <workdir> [--quality N] [--age-days N]`
+- **Options:**
+  - `--quality` — ffmpeg JPEG quality scale (1 = best, 31 = worst, default: `2`)
+  - `--age-days` — skip files newer than this many days (default: `180`)
+- **Dependencies:** ffmpeg
+
+### `server-kit/git-check.py`
+Recursively finds Git repositories under a root directory and reports any that are not aligned: uncommitted changes, commits to push, or (optionally) commits to pull from remote.
+- **Usage:** `py server-kit/git-check.py <workdir> [--fetch] [--depth N]`
+- **Options:**
+  - `--fetch` — run `git fetch` on each repo before checking (slower, enables pull detection)
+  - `--depth` — max directory depth to search (default: `2`)
+- **Dependencies:** git
+
+### `server-kit/video-optimizer.py`
+Recursively scans a directory for MP4 files and re-encodes them with H.264 + AAC (`-movflags faststart`) if they are not already optimized. Skips files below a minimum size.
+- **Usage:** `py server-kit/video-optimizer.py <workdir> [--min-size MB]`
+- **Options:**
+  - `--min-size` — skip files smaller than this many MB (default: `50`)
+- **Dependencies:** ffmpeg, ffprobe
