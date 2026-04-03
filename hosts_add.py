@@ -23,14 +23,14 @@ def load_env(env_path):
                     env[key.strip()] = value.strip()
     return env
 
-ENV = load_env(script_dir / "hosts_add.env")
+ENV = load_env(script_dir / ".env")
 
 def load_presets():
-    """Read PRESET_N=ip|label lines from ENV and return an ordered list of (ip, label)."""
+    """Read HOSTS_ADD_PRESET_N=ip|label lines from ENV and return an ordered list of (ip, label)."""
     presets = []
     i = 1
     while True:
-        value = ENV.get(f'PRESET_{i}')
+        value = ENV.get(f'HOSTS_ADD_PRESET_{i}')
         if value is None:
             break
         parts = value.split('|', 1)
