@@ -54,6 +54,7 @@ toolkit/
 ├── pdf_merge.py
 ├── pdf_split.py
 ├── pdf_rotate.py
+├── md_to_pdf.py
 ├── videos_to_mp4.py
 ├── videos_compress.py
 ├── videos_resize.py
@@ -162,6 +163,12 @@ Rotates pages in a PDF.
 - **Output:** Rotated PDF
 - **Parameters (interactive):** Page selection (all / range / specific pages), rotation angle (90 / 180 / 270)
 - **Dependencies:** pypdf
+
+### `md_to_pdf.py`
+Converts Markdown files to PDF (tables and code blocks styled for print).
+- **Input:** `.md` files in `src/`
+- **Output:** One PDF per file
+- **Dependencies:** markdown, xhtml2pdf
 
 ---
 
