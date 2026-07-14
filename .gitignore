@@ -2,6 +2,7 @@
 # Ogni utente ha i propri file in queste cartelle
 src/
 out/
+themes/*.css
 
 # Environment / local config
 *.env

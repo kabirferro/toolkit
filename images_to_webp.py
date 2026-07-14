@@ -1,50 +1,40 @@
-import os
-import sys
-from pathlib import Path
+from _core import run, require_pip, iter_src, no_files_warning, done, OUT_DIR
 
-try:
-    from PIL import Image, UnidentifiedImageError
-except ImportError:
-    print("\n⚠  MISSING DEPENDENCY\n")
-    print("Pillow is not installed.\n")
-    print("Install with:")
-    print("  py -m pip install Pillow\n")
-    input("Press ENTER to exit...")
-    sys.exit(1)
+require_pip(PIL="Pillow")
 
-script_dir = Path(__file__).parent.resolve()
-os.chdir(script_dir)
-
-SRC_DIR = script_dir / "src"
-OUT_DIR = script_dir / "out"
-OUT_DIR.mkdir(exist_ok=True)
+from PIL import Image, UnidentifiedImageError
 
 QUALITY = 80
 LOSSLESS = False
+SUPPORTED = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif', '.webp'}
 
-print("\n=== IMAGES TO WEBP ===\n")
 
-
-def convert_to_webp(in_path: Path, out_path: Path, quality=QUALITY, lossless=LOSSLESS):
+def convert_to_webp(in_path, out_path):
     try:
         with Image.open(in_path) as im:
             if im.mode not in ("RGB", "RGBA"):
                 im = im.convert("RGBA" if "A" in im.getbands() else "RGB")
-            save_kwargs = {"format": "WEBP", "quality": quality}
-            if lossless:
+            save_kwargs = {"format": "WEBP", "quality": QUALITY}
+            if LOSSLESS:
                 save_kwargs["lossless"] = True
             im.save(out_path, **save_kwargs)
         print(f"✓ {in_path.name} -> {out_path.name}")
+        return True
     except UnidentifiedImageError:
         print(f"✗ Not a valid image: {in_path.name}")
     except Exception as e:
         print(f"✗ Error processing {in_path.name}: {e}")
+    return False
 
 
-processed = 0
-for file_path in SRC_DIR.iterdir():
-    if file_path.is_file():
-        convert_to_webp(file_path, OUT_DIR / (file_path.stem + ".webp"))
-        processed += 1
+@run("IMAGES TO WEBP")
+def main():
+    files = iter_src(SUPPORTED)
+    if not files:
+        no_files_warning("images", SUPPORTED)
+        return
+    processed = sum(convert_to_webp(f, OUT_DIR / (f.stem + ".webp")) for f in files)
+    done(processed, len(files), "images")
 
-print(f"\n=== Done! {processed} files processed ===\n")
+
+main()

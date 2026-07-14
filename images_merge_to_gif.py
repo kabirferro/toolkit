@@ -1,56 +1,33 @@
-import os
-import sys
-from pathlib import Path
+from _core import run, require_pip, iter_src, no_files_warning, ask_text, ask_int, ask_yes_no, OUT_DIR
 
-try:
-    from PIL import Image
-except ImportError:
-    print("\n⚠  MISSING DEPENDENCY\n")
-    print("Pillow is not installed.\n")
-    print("Install with:")
-    print("  py -m pip install Pillow\n")
-    input("Press ENTER to exit...")
-    sys.exit(1)
+require_pip(PIL="Pillow")
 
-script_dir = Path(__file__).parent.resolve()
-os.chdir(script_dir)
+from PIL import Image
 
-SRC_DIR = script_dir / "src"
-OUT_DIR = script_dir / "out"
-OUT_DIR.mkdir(exist_ok=True)
+SUPPORTED = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif'}
 
-SUPPORTED_FORMATS = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif'}
 
-print("\n=== IMAGES TO GIF ===\n")
+@run("IMAGES TO GIF")
+def main():
+    output_name = ask_text("Output filename (without extension)", default="animated")
+    fps = ask_int("FPS (frames per second)", default=10, min_value=1, max_value=60)
+    loop = 0 if ask_yes_no("Infinite loop?", default=True) else 1  # 0 = infinite
+    duration = int(1000 / fps)
 
-output_name = input("Output filename (without extension, default: animated): ").strip() or "animated"
+    print(f"\nCreating GIF at {fps} FPS (frame duration: {duration}ms)")
+    print(f"Loop: {'infinite' if loop == 0 else 'once'}\n")
 
-fps_input = input("FPS (frames per second, default 10): ").strip()
-fps = int(fps_input) if fps_input.isdigit() else 10
+    image_files = iter_src(SUPPORTED)
+    if not image_files:
+        no_files_warning("images", SUPPORTED)
+        return
 
-loop_input = input("Infinite loop? (y/n, default y): ").strip().lower()
-loop = 0 if loop_input != 'n' else 1  # 0 = infinite, 1 = once
+    print(f"Found {len(image_files)} images:\n")
+    for idx, f in enumerate(image_files, 1):
+        print(f"  {idx}. {f.name}")
+    print()
 
-duration = int(1000 / fps)
-
-print(f"\nCreating GIF at {fps} FPS (frame duration: {duration}ms)")
-print(f"Loop: {'infinite' if loop == 0 else 'once'}\n")
-
-image_files = sorted([
-    f for f in SRC_DIR.iterdir()
-    if f.is_file() and f.suffix.lower() in SUPPORTED_FORMATS
-])
-
-if not image_files:
-    print("⚠  No images found in src/")
-    sys.exit(0)
-
-print(f"Found {len(image_files)} images:\n")
-for idx, f in enumerate(image_files, 1):
-    print(f"  {idx}. {f.name}")
-
-frames = []
-try:
+    frames = []
     for img_file in image_files:
         img = Image.open(img_file)
         if img.mode == 'RGBA':
@@ -76,8 +53,7 @@ try:
     print(f"File:   {output_path}")
     print(f"Size:   {file_size:.1f} KB")
     print(f"Frames: {len(frames)}")
-    print(f"FPS:    {fps}\n")
+    print(f"FPS:    {fps}")
 
-except Exception as e:
-    print(f"\n✗ Error creating GIF: {e}\n")
 
+main()

@@ -1,40 +1,14 @@
-import os
-import sys
-from pathlib import Path
+from _core import run, require_pip, iter_src, no_files_warning, done, ask_choice, OUT_DIR
 
-try:
-    from pypdf import PdfReader, PdfWriter
-except ImportError:
-    print("\n⚠  MISSING DEPENDENCY\n")
-    print("pypdf is not installed.\n")
-    print("Install with:")
-    print("  py -m pip install pypdf\n")
-    input("Press ENTER to exit...")
-    sys.exit(1)
+require_pip(pypdf="pypdf")
 
-script_dir = Path(__file__).parent.resolve()
-os.chdir(script_dir)
+from pypdf import PdfReader, PdfWriter
 
-SRC_DIR = script_dir / "src"
-OUT_DIR = script_dir / "out"
-OUT_DIR.mkdir(exist_ok=True)
-
-print("\n=== PDF COMPRESS ===\n")
-
-print("Compression level:")
-print("1. Low    (high quality, minimal compression)")
-print("2. Medium (balanced)")
-print("3. High   (smaller file, lower quality)")
-level_input = input("\nChoose level (1-3, default 2): ").strip()
-level = int(level_input) if level_input in ('1', '2', '3') else 2
-
-compression_levels = {1: 0, 2: 6, 3: 9}
-compress_level = compression_levels[level]
-level_names = {1: 'minimal', 2: 'medium', 3: 'maximum'}
-print(f"\nLevel {level}: {level_names[level]} compression\n")
+COMPRESSION_LEVELS = {1: 0, 2: 6, 3: 9}
+LEVEL_NAMES = {1: 'minimal', 2: 'medium', 3: 'maximum'}
 
 
-def compress_pdf(input_path: Path, output_path: Path, level: int):
+def compress_pdf(input_path, output_path, level):
     try:
         reader = PdfReader(input_path)
         writer = PdfWriter()
@@ -55,15 +29,21 @@ def compress_pdf(input_path: Path, output_path: Path, level: int):
         return False
 
 
-processed = 0
-total = 0
-for file_path in sorted(SRC_DIR.glob("*.pdf")):
-    total += 1
-    if compress_pdf(file_path, OUT_DIR / f"{file_path.stem}.pdf", compress_level):
-        processed += 1
+@run("PDF COMPRESS")
+def main():
+    level = ask_choice("Compression level", [
+        "Low    (high quality, minimal compression)",
+        "Medium (balanced)",
+        "High   (smaller file, lower quality)",
+    ], default=2)
+    print(f"\nLevel {level}: {LEVEL_NAMES[level]} compression\n")
 
-if total == 0:
-    print("⚠  No PDF files found in src/\n")
-else:
-    print(f"=== Done! {processed}/{total} PDFs compressed ===\n")
+    files = iter_src({'.pdf'})
+    if not files:
+        no_files_warning("PDF files", {'.pdf'})
+        return
+    processed = sum(compress_pdf(f, OUT_DIR / f.name, COMPRESSION_LEVELS[level]) for f in files)
+    done(processed, len(files), "PDFs")
 
+
+main()

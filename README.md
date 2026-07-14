@@ -2,6 +2,8 @@
 
 A collection of Python CLI scripts for batch processing images, PDFs, and videos.
 
+Every root script is double-click friendly on Windows: it checks its own dependencies, asks settings interactively, processes `src/` into `out/`, prints a summary and waits for ENTER before closing (so errors stay visible). Shared plumbing lives in the `_core/` package.
+
 ---
 
 ## Setup
@@ -14,7 +16,7 @@ A collection of Python CLI scripts for batch processing images, PDFs, and videos
 ### Install Python dependencies
 
 ```bash
-py -m pip install Pillow pillow-heif pypdf reportlab
+py -m pip install Pillow pillow-heif pypdf pypdfium2 reportlab markdown xhtml2pdf
 ```
 
 ### Install ffmpeg (video scripts only)
@@ -41,6 +43,7 @@ Both `src/` and `out/` are created automatically on first run.
 
 ```
 toolkit/
+├── _core/                  # Shared runtime (deps check, prompts, src/out handling)
 ├── src/                    # Input files
 ├── out/                    # Output files (auto-created)
 ├── images_to_jpg.py
@@ -54,10 +57,14 @@ toolkit/
 ├── pdf_merge.py
 ├── pdf_split.py
 ├── pdf_rotate.py
+├── pdf_to_images.py
+├── pdf_extract_text.py
 ├── md_to_pdf.py
 ├── videos_to_mp4.py
 ├── videos_compress.py
 ├── videos_resize.py
+├── videos_to_audio.py
+├── mov_to_mp4.py
 ├── hosts_add.py
 ├── .env.example            # Config template (commit this)
 ├── .env                    # Your local config (gitignored)
@@ -164,10 +171,28 @@ Rotates pages in a PDF.
 - **Parameters (interactive):** Page selection (all / range / specific pages), rotation angle (90 / 180 / 270)
 - **Dependencies:** pypdf
 
+### `pdf_to_images.py`
+Renders each PDF page to an image file.
+- **Input:** PDF files in `src/`
+- **Output:** One image per page (e.g. `document-01.jpg`)
+- **Parameters (interactive):** Format (JPG / PNG), resolution in DPI (default 150)
+- **Dependencies:** pypdfium2
+
+### `pdf_extract_text.py`
+Extracts the text layer from PDFs to plain text files (no OCR: scanned PDFs yield empty text).
+- **Input:** PDF files in `src/`
+- **Output:** One `.txt` per PDF
+- **Parameters (interactive):** Plain text or with `--- Page N ---` markers
+- **Dependencies:** pypdf
+
 ### `md_to_pdf.py`
 Converts Markdown files to PDF (tables and code blocks styled for print).
 - **Input:** `.md` files in `src/`
 - **Output:** One PDF per file
+- **Themes (interactive):**
+  1. **Classic** -- neutral print style, white page
+  2. **Claude** -- Anthropic-inspired: cream page, serif headings, coral accents
+  3. **Custom** -- any `.css` file in `themes/` is listed automatically (see `themes/README.md`; start from `themes/_template.css`)
 - **Dependencies:** markdown, xhtml2pdf
 
 ---
@@ -198,6 +223,18 @@ Resizes videos. Two modes available.
   1. **Fit** -- scale to target dimensions, pad to fill with blur / black / white background
   2. **Percentage** -- proportional resize by percentage
 - **Dependencies:** ffmpeg, ffprobe
+
+### `videos_to_audio.py`
+Extracts the audio track from videos.
+- **Input:** MP4, MOV, AVI, MKV, WebM, FLV, WMV, M4V
+- **Output (interactive):** MP3 (192k) / M4A-AAC (192k) / WAV (uncompressed)
+- **Dependencies:** ffmpeg
+
+### `mov_to_mp4.py`
+Converts MOV files to MP4 stripping the audio track (H.264, no audio).
+- **Input:** MOV files in `src/`
+- **Output:** MP4 without audio
+- **Dependencies:** ffmpeg
 
 ---
 
