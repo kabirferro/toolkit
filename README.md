@@ -59,6 +59,7 @@ toolkit/
 ├── pdf_rotate.py
 ├── pdf_to_images.py
 ├── pdf_extract_text.py
+├── pdf_labels.py
 ├── md_to_pdf.py
 ├── videos_to_mp4.py
 ├── videos_compress.py
@@ -184,6 +185,14 @@ Extracts the text layer from PDFs to plain text files (no OCR: scanned PDFs yiel
 - **Output:** One `.txt` per PDF
 - **Parameters (interactive):** Plain text or with `--- Page N ---` markers
 - **Dependencies:** pypdf
+
+### `pdf_labels.py`
+Generates a label sheet: divides an A4 page into a regular grid and prints one bold, centered label per cell. Text-only, no input files from `src/`.
+- **Input:** none (labels are typed in, comma-separated)
+- **Output:** PDF (name chosen interactively, default `labels.pdf`)
+- **Parameters (interactive):** number of rows, number of columns, font size (points), the comma-separated labels
+- **Layout:** 1mm margin on every A4 edge, equal cells; the chosen font size is used as-is and only auto-shrinks for a label that would not fit its cell on one line; labels beyond one page's cells spill onto new pages
+- **Dependencies:** reportlab
 
 ### `md_to_pdf.py`
 Converts Markdown files to PDF (tables and code blocks styled for print).
