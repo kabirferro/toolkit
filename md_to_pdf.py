@@ -90,6 +90,129 @@ def make_bg_png(rgb):
     return f.name.replace("\\", "/")
 
 
+# --- Soft-wrapping of <pre> blocks -------------------------------------------
+# xhtml2pdf renders `white-space: pre` by turning every space into a NBSP, so a
+# long code line can never wrap: it just runs off the page and gets clipped.
+# We therefore break long lines ourselves, at a width derived from the theme's
+# page size, margins and `pre` font-size (monospace advance = 0.6em).
+
+PAGE_SIZES = {
+    "a3": (841.89, 1190.55), "a4": (595.28, 841.89), "a5": (419.53, 595.28),
+    "letter": (612.0, 792.0), "legal": (612.0, 1008.0),
+}
+CSS_UNITS = {"pt": 1.0, "px": 0.75, "pc": 12.0, "in": 72.0,
+             "cm": 72 / 2.54, "mm": 72 / 25.4, "em": 10.0}
+LENGTH_RE = re.compile(r"(-?\d*\.?\d+)\s*(pt|px|pc|in|cm|mm|em)?", re.I)
+TOKEN_RE = re.compile(r"(<[^>]+>|&[#A-Za-z0-9]+;)")
+
+
+def _length(value, default=0.0):
+    m = LENGTH_RE.match(value.strip())
+    if not m:
+        return default
+    return float(m.group(1)) * CSS_UNITS.get((m.group(2) or "pt").lower(), 1.0)
+
+
+def _sides(value):
+    """Return (left, right) from a CSS margin/padding shorthand."""
+    parts = value.split()
+    if not parts:
+        return 0.0, 0.0
+    if len(parts) == 1:
+        v = _length(parts[0])
+        return v, v
+    if len(parts) < 4:
+        v = _length(parts[1])
+        return v, v
+    return _length(parts[3]), _length(parts[1])
+
+
+def _rule(css, selector):
+    """Merge the declarations of every rule whose selector list has `selector`."""
+    decls = {}
+    css = re.sub(r"/\*.*?\*/", " ", css, flags=re.S)  # comments break the parse
+    for sel, block in re.findall(r"([^{}]+)\{([^}]*)\}", css):
+        if selector not in [s.strip() for s in sel.split(",")]:
+            continue
+        for decl in block.split(";"):
+            if ":" in decl:
+                k, _, v = decl.partition(":")
+                decls[k.strip().lower()] = v.strip()
+    return decls
+
+
+def pre_width(css):
+    """Max characters that fit on one line of a <pre> block for this theme."""
+    page = _rule(css, "@page")
+    size = page.get("size", "A4").lower()
+    dims = next((v for k, v in PAGE_SIZES.items() if k in size), PAGE_SIZES["a4"])
+    width = max(dims) if "landscape" in size else min(dims)
+    explicit = LENGTH_RE.findall(size)
+    if len(explicit) >= 2 and explicit[0][1]:
+        width = _length(size)
+
+    ml, mr = _sides(page.get("margin", "2cm"))
+    pre = _rule(css, "pre")
+    pl, pr = _sides(pre.get("padding", "0"))
+    font_size = _length(pre.get("font-size", "10pt"), 10.0)
+
+    usable = width - ml - mr - pl - pr - 4  # -4pt for borders and rounding
+    return max(int(usable / (0.6 * font_size)), 20)
+
+
+def wrap_pre_line(line, width):
+    """Break one <pre> line to `width` visible chars, keeping tags intact."""
+    units = []
+    for tok in TOKEN_RE.split(line):
+        if not tok:
+            continue
+        if tok.startswith("<"):
+            units.append((tok, 0))          # markup: no visible width
+        elif tok.startswith("&") and tok.endswith(";"):
+            units.append((tok, 1))          # entity: one visible char
+        else:
+            units.extend((ch, 1) for ch in tok)
+    if sum(w for _, w in units) <= width:
+        return line
+
+    indent = 0
+    for text, w in units:
+        if w and text == " ":
+            indent += 1
+        elif w:
+            break
+    cont = " " * min(indent + 2, width // 2)
+
+    out, col, last_space, seen = [], 0, -1, False
+    for text, w in units:
+        if w and col >= width:
+            if last_space >= 0:
+                tail = out[last_space + 1:]
+                out = out[:last_space] + [("\n" + cont, 0)] + tail
+                col = len(cont) + sum(t[1] for t in tail)
+            else:
+                out.append(("\n" + cont, 0))
+                col = len(cont)
+            last_space = -1
+        if w:
+            if text == " ":
+                if seen:
+                    last_space = len(out)
+            else:
+                seen = True
+        out.append((text, w))
+        col += w
+    return "".join(text for text, _ in out)
+
+
+def wrap_pre_blocks(html, width):
+    def repl(m):
+        body = "\n".join(wrap_pre_line(l, width) for l in m.group(2).split("\n"))
+        return m.group(1) + body + m.group(3)
+
+    return re.sub(r"(<pre[^>]*>)(.*?)(</pre>)", repl, html, flags=re.S)
+
+
 def convert_to_pdf(in_path, out_path, css):
     try:
         text = in_path.read_text(encoding="utf-8")
@@ -108,6 +231,9 @@ def convert_to_pdf(in_path, out_path, css):
         # lose their borders unless they contain at least a &nbsp;.
         body = body.replace("<table>", '<table cellpadding="5">')
         body = re.sub(r"<(td|th)([^>]*)>\s*</\1>", r"<\1\2>&nbsp;</\1>", body)
+        # Long code lines cannot wrap in xhtml2pdf's `white-space: pre`, so
+        # they would be clipped at the page edge: break them ourselves.
+        body = wrap_pre_blocks(body, pre_width(css))
         html = f"<html><head><meta charset='utf-8'><style>{css}</style></head><body>{body}</body></html>"
         with open(out_path, "wb") as f:
             result = pisa.CreatePDF(html, dest=f, encoding="utf-8")

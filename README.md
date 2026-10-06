@@ -135,8 +135,8 @@ Converts images to a single PDF file. Two modes available.
 - **Output:** `images.pdf`
 - **Modes (interactive):**
   1. **Single page** -- one image per page  
-     - Layout: Fit / Fill / Original  
-     - Page size: A4 / Letter / Custom
+     - Layout: Fit (page = image size) / Fill (white page, image centered with 1 cm margin) / Original  
+     - Page size: A4 / Letter / Custom (pixels at 100 dpi)
   2. **Thumbnails** -- grid layout with filenames  
      - Configurable images per row (1-10, default 5)  
      - Auto page breaks, multi-page support
@@ -188,10 +188,11 @@ Extracts the text layer from PDFs to plain text files (no OCR: scanned PDFs yiel
 
 ### `pdf_labels.py`
 Generates a label sheet: divides an A4 page into a regular grid and prints one bold, centered label per cell. Text-only, no input files from `src/`.
-- **Input:** none (labels are typed in, comma-separated)
+- **Input:** none (labels are typed in, one per line -- blank line to finish; commas on a line still split it into several labels)
 - **Output:** PDF (name chosen interactively, default `labels.pdf`)
-- **Parameters (interactive):** number of rows, number of columns, font size (points), the comma-separated labels
-- **Layout:** 1mm margin on every A4 edge, equal cells; the chosen font size is used as-is and only auto-shrinks for a label that would not fit its cell on one line; labels beyond one page's cells spill onto new pages
+- **Parameters (interactive):** number of rows, number of columns, font size (points), the labels
+- **Multi-line labels:** a label too wide for its cell wraps automatically on spaces; use `|` inside a label to force a line break (e.g. `Riga uno|Riga due`)
+- **Layout:** 1mm margin on every A4 edge, equal cells; the text block is centered in its cell, and the chosen font size is used as-is and only auto-shrinks when even the wrapped text would not fit; labels beyond one page's cells spill onto new pages
 - **Dependencies:** reportlab
 
 ### `md_to_pdf.py`

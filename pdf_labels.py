@@ -11,30 +11,77 @@ MARGIN = 1 * mm          # 1mm on every A4 edge
 CELL_PAD = 1.5 * mm      # inner padding so text never touches the cell edge
 FONT = "Helvetica-Bold"  # bold, as requested
 MIN_FONT = 4             # lower bound: below this the text is unreadable
+LINE_SPACING = 1.15      # line height as a multiple of the font size
+BREAK = "|"              # forces a line break inside a label
 
 
-def fit_font_size(c, text, max_w, max_h, start_size):
-    """Font size (points) for `text` on one line inside a max_w x max_h box.
-    Keeps `start_size` if it fits; otherwise shrinks down to MIN_FONT."""
+def wrap_text(c, text, max_w, size):
+    """Split `text` into lines that fit `max_w` at `size`. Honours the explicit
+    BREAK character first, then wraps long lines on spaces. A single word that
+    is still too wide is kept as is (the font size will shrink instead)."""
+    lines = []
+    for chunk in text.split(BREAK):
+        words = chunk.strip().split()
+        if not words:
+            lines.append("")
+            continue
+        current = words[0]
+        for word in words[1:]:
+            candidate = f"{current} {word}"
+            if c.stringWidth(candidate, FONT, size) <= max_w:
+                current = candidate
+            else:
+                lines.append(current)
+                current = word
+        lines.append(current)
+    return lines
+
+
+def fit_text(c, text, max_w, max_h, start_size):
+    """Return (size, lines) for `text` inside a max_w x max_h box, keeping
+    `start_size` if it fits and shrinking down to MIN_FONT otherwise."""
     size = start_size
     while size > MIN_FONT:
-        width = c.stringWidth(text, FONT, size)
-        ascent, descent = getAscentDescent(FONT, size)  # descent is negative
-        height = ascent - descent
-        if width <= max_w and height <= max_h:
-            return size
+        lines = wrap_text(c, text, max_w, size)
+        widest = max(c.stringWidth(line, FONT, size) for line in lines)
+        height = size * LINE_SPACING * len(lines)
+        if widest <= max_w and height <= max_h:
+            return size, lines
         size -= 0.5
-    return MIN_FONT
+    return MIN_FONT, wrap_text(c, text, max_w, MIN_FONT)
 
 
 def draw_cell(c, text, cx, cy, max_w, max_h, start_size):
-    """Draw `text` bold, centred on (cx, cy). Returns the size actually used."""
-    size = fit_font_size(c, text, max_w, max_h, start_size)
+    """Draw `text` bold, centred on (cx, cy), over as many lines as needed.
+    Returns (size used, number of lines)."""
+    size, lines = fit_text(c, text, max_w, max_h, start_size)
     ascent, descent = getAscentDescent(FONT, size)
-    baseline = cy - (ascent + descent) / 2  # centre the glyph box on cy
+    leading = size * LINE_SPACING
+    block_h = leading * len(lines)
+    # top baseline: centre the whole block on cy, then drop to the first baseline
+    baseline = cy + block_h / 2 - (leading + ascent + descent) / 2
     c.setFont(FONT, size)
-    c.drawCentredString(cx, baseline, text)
-    return size
+    for line in lines:
+        c.drawCentredString(cx, baseline, line)
+        baseline -= leading
+    return size, len(lines)
+
+
+def read_labels():
+    """Read labels interactively: one per line, blank line to finish. Commas
+    still split a line into several labels (backwards compatible)."""
+    print(f"Labels: one per line, use '{BREAK}' inside a label to force a line break.")
+    print("Commas also separate labels. Empty line when you are done.")
+    labels = []
+    while True:
+        try:
+            line = input("> ").strip()
+        except EOFError:
+            break
+        if not line:
+            break
+        labels.extend(part.strip() for part in line.split(",") if part.strip())
+    return labels
 
 
 @run("PDF LABELS")
@@ -51,8 +98,7 @@ def main():
                           default=48, min_value=0)
 
     print()
-    raw = ask_text("Labels (comma-separated, one per cell)")
-    labels = [part.strip() for part in raw.split(",") if part.strip()]
+    labels = read_labels()
     if not labels:
         print("\n⚠  No labels entered.")
         return
@@ -82,8 +128,13 @@ def main():
         r, col = divmod(slot, cols)
         cx = MARGIN + col * cell_w + cell_w / 2
         cy = page_h - MARGIN - r * cell_h - cell_h / 2
-        used = draw_cell(c, text, cx, cy, box_w, box_h, font_size)
-        note = "" if used == font_size else f"  (shrunk to {used:g}pt)"
+        used, n_lines = draw_cell(c, text, cx, cy, box_w, box_h, font_size)
+        notes = []
+        if used != font_size:
+            notes.append(f"shrunk to {used:g}pt")
+        if n_lines > 1:
+            notes.append(f"{n_lines} lines")
+        note = f"  ({', '.join(notes)})" if notes else ""
         print(f"✓ {text}{note}")
     c.save()
 

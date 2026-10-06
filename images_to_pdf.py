@@ -10,12 +10,14 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 OUTPUT_NAME = "images"
+DPI = 100                          # pixel density used when saving the PDF
+MARGIN_PX = round(DPI / 2.54)      # 1 cm margin on every side (Fill layout)
 
 
 def single_page_mode():
     layout = ask_choice("\nImage layout", [
         "Fit  (scale to fit the page, keep proportions)",
-        "Fill (fill the page, may crop)",
+        "Fill (white page, image centered with 1 cm margin)",
         "Original (keep original dimensions)",
     ], default=1)
 
@@ -26,11 +28,11 @@ def single_page_mode():
         "Custom",
     ], default=1)
     if size_choice == 2:
-        page_size = (612, 792)  # Letter in points
+        page_size = (round(8.5 * DPI), round(11 * DPI))  # Letter at DPI
     elif size_choice == 3:
         page_size = (ask_int("Width in pixels", min_value=1), ask_int("Height in pixels", min_value=1))
     else:
-        page_size = (595, 842)  # A4 in points
+        page_size = (round(21.0 / 2.54 * DPI), round(29.7 / 2.54 * DPI))  # A4 at DPI
 
     supported = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif'}
     image_files = iter_src(supported)
@@ -58,19 +60,12 @@ def single_page_mode():
 
         if layout == 1:  # Fit
             img.thumbnail(page_size, Image.Resampling.LANCZOS)
-        elif layout == 2:  # Fill
-            img_ratio = img.width / img.height
-            page_ratio = page_size[0] / page_size[1]
-            if img_ratio > page_ratio:
-                new_width = page_size[0]
-                new_height = int(new_width / img_ratio)
-            else:
-                new_height = page_size[1]
-                new_width = int(new_height * img_ratio)
-            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            left = (new_width - page_size[0]) // 2
-            top = (new_height - page_size[1]) // 2
-            img = img.crop((left, top, left + page_size[0], top + page_size[1]))
+        elif layout == 2:  # Fill: white page, image fitted inside 1 cm margins, centered
+            box = (max(1, page_size[0] - 2 * MARGIN_PX), max(1, page_size[1] - 2 * MARGIN_PX))
+            img.thumbnail(box, Image.Resampling.LANCZOS)
+            page = Image.new('RGB', page_size, (255, 255, 255))
+            page.paste(img, ((page_size[0] - img.width) // 2, (page_size[1] - img.height) // 2))
+            img = page
         # layout 3 (original): no change
 
         images.append(img)
@@ -78,9 +73,9 @@ def single_page_mode():
 
     output_path = OUT_DIR / f"{OUTPUT_NAME}.pdf"
     if len(images) == 1:
-        images[0].save(output_path, "PDF", resolution=100.0)
+        images[0].save(output_path, "PDF", resolution=float(DPI))
     else:
-        images[0].save(output_path, "PDF", resolution=100.0, save_all=True, append_images=images[1:])
+        images[0].save(output_path, "PDF", resolution=float(DPI), save_all=True, append_images=images[1:])
 
     file_size = output_path.stat().st_size / 1024
     print(f"\n=== PDF created successfully! ===")
